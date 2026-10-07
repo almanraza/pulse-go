@@ -16,7 +16,7 @@ func main() {
 		}
 		json.NewEncoder(w).Encode(map[string]string{
 			"message": "Hello from PulseGo",
-			"version": "1.0.0",
+			"version": "1.0.1",
 		})
 	})
 
