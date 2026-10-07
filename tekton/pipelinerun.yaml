@@ -1,0 +1,26 @@
+apiVersion: tekton.dev/v1
+kind: PipelineRun
+metadata:
+  generateName: pulse-go-run-
+  namespace: pulse-ci
+spec:
+  pipelineRef:
+    name: build-and-deploy
+  taskRunTemplate:
+    serviceAccountName: pipeline-sa
+  params:
+  - name: repo-url
+    value: https://github.com/almanraza/pulse-go.git
+  - name: image
+    value: docker.io/almanraza/pulse-go
+  workspaces:
+  - name: source
+    volumeClaimTemplate:
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+  - name: dockerconfig
+    secret:
+      secretName: registry-creds

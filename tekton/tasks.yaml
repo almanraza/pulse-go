@@ -1,0 +1,72 @@
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: git-clone-simple
+  namespace: pulse-ci
+spec:
+  params:
+  - name: repo-url
+  - name: revision
+    default: main
+  workspaces:
+  - name: source
+  results:
+  - name: commit
+  steps:
+  - name: clone
+    image: alpine/git:latest
+    script: |
+      #!/bin/sh
+      set -eu
+      git config --global --add safe.directory '*'
+      git clone --depth 1 --branch "$(params.revision)" "$(params.repo-url)" "$(workspaces.source.path)"
+      cd "$(workspaces.source.path)"
+      printf "%s" "$(git rev-parse --short=8 HEAD)" > "$(results.commit.path)"
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: kaniko-build-push
+  namespace: pulse-ci
+spec:
+  params:
+  - name: image
+  - name: tag
+  workspaces:
+  - name: source
+  - name: dockerconfig
+  steps:
+  - name: build-and-push
+    image: gcr.io/kaniko-project/executor:v1.23.2
+    env:
+    - name: DOCKER_CONFIG
+      value: $(workspaces.dockerconfig.path)
+    args:
+    - --dockerfile=$(workspaces.source.path)/Dockerfile
+    - --context=$(workspaces.source.path)
+    - --destination=$(params.image):$(params.tag)
+---
+apiVersion: tekton.dev/v1
+kind: Task
+metadata:
+  name: deploy-to-k8s
+  namespace: pulse-ci
+spec:
+  params:
+  - name: image
+  - name: tag
+  - name: namespace
+    default: pulse
+  workspaces:
+  - name: source
+  steps:
+  - name: deploy
+    image: bitnami/kubectl:latest
+    script: |
+      #!/bin/sh
+      set -eu
+      cd "$(workspaces.source.path)"
+      kubectl apply -n $(params.namespace) -f k8s/service.yaml
+      sed "s|IMAGE_PLACEHOLDER|$(params.image):$(params.tag)|" k8s/deployment.yaml \
+        | kubectl apply -n $(params.namespace) -f -
+      kubectl rollout status deployment/pulse-go -n $(params.namespace) --timeout=120s

@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pipeline-sa
+  namespace: pulse-ci
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pulse-deployer
+  namespace: pulse
+rules:
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "patch", "update"]
+- apiGroups: [""]
+  resources: ["services"]
+  verbs: ["get", "list", "create", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pulse-deployer
+  namespace: pulse
+subjects:
+- kind: ServiceAccount
+  name: pipeline-sa
+  namespace: pulse-ci
+roleRef:
+  kind: Role
+  name: pulse-deployer
+  apiGroup: rbac.authorization.k8s.io
